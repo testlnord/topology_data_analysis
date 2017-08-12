@@ -20,33 +20,40 @@ Grid <- expand.grid(sl.seq, sw.seq, pl.seq, pw.seq)
 # grid.diag <- gridDiag(iris[,1:4], FUN=kde, h=0.3, lim=cbind(sl.lim, sw.lim, pl.lim, pw.lim)
 #                     by = by, sublevel = FALSE, library = "Dionysus",
 #                     printProgress = FALSE)
-rips.diag <- ripsDiag(iris[,1:4], maxdimension = 2, maxscale = 5)
+spc <- iris$Species
+iris$Species <- as.integer(spc)
+rips.diag <- ripsDiag(iris, maxdimension = 2, maxscale = 5)
 plot(rips.diag[['diagram']])
 # получаем, что есть устойчивые два кластера одномерных. А все циклы быстро зарастают.
 library(ggfortify)
-autoplot(prcomp(iris[,1:4]))
+autoplot(prcomp(iris))
 #видим те же два кластера на картинке
 data("diamonds")
-df <- diamonds[c("carat", "price","depth", "table")][sample(1:nrow(diamonds), 500),]
-r.diag <- ripsDiag(df, maxdimension = 2, maxscale = 100)
-plot(r.diag[['diagram']])
+diamonds$color <- as.integer(diamonds$color)
+diamonds$cut <- as.integer(diamonds$cut)
+diamonds$clarity <- as.integer(diamonds$clarity)
+#c("carat", "price", 'x','y','z', 'color', 'cut')
+df <- diamonds[sample(1:nrow(diamonds), 500),]
 autoplot(prcomp(df))
 
+r.diag <- ripsDiag(df, maxdimension = 2, maxscale = 100)
+plot(r.diag[['diagram']])
+
 # https://cran.r-project.org/web/packages/TDA/vignettes/article.pdf
-m <- 80     # subsample si  ze
-n <- 10     # we will compute n landscapes using subsamples of size m
+m <- 80     # subsample size
+n <- 50     # we will compute n landscapes using subsamples of size m
+maxscale <- 10
 tseq <- seq(0, maxscale, length = 500)          #domain of landscapes
 #here we store n Rips diags
-  Diags <- list()
+Diags <- list()
 #here we store n landscapes
-  Lands <- matrix(0, nrow = n, ncol = length(tseq))
+Lands <- matrix(0, nrow = n, ncol = length(tseq))
 
 for (i in seq_len(n)) {
-    subX <- X[sample(seq_len(N), m), ]
-     Diags[[i]] <- ripsDiag(subX, maxdimension = 1, maxscale = 5)
-     Lands[i, ] <- landscape(Diags[[i]][["diagram"]], dimension = 1,
-                              +                           KK = 1, tseq)
-   }
+    subX <- diamonds[sample(seq_len(nrow(diamonds)), m), ]
+    Diags[[i]] <- ripsDiag(subX, maxdimension = 1, maxscale = maxscale)
+    Lands[i, ] <- landscape(Diags[[i]][["diagram"]], dimension = 0, KK = 1, tseq)
+}
 bootLand <- multipBootstrap(Lands, B = 100, alpha = 0.05,
                             parallel = FALSE)
 
@@ -55,3 +62,12 @@ polygon(c(tseq, rev(tseq)),
         c(bootLand[["band"]][, 1], rev(bootLand[["band"]][, 2])),
         col = "pink")
 lines(tseq, bootLand[["mean"]], lwd = 2, col = 2)
+
+# так себе история. Мы получаем одну компоненту связности :(
+# даже с ирисами интереснее
+mscale = 3
+rips.diag <- ripsDiag(iris, maxdimension = 1, maxscale = mscale)
+tseq <- seq(0, mscale, length = 1000)   #domain
+iris.land <- landscape(rips.diag[["diagram"]], dimension = 0, KK = 1, tseq)
+iris.sil <- silhouette(rips.diag[["diagram"]], p = 1, dimension = 0, tseq)
+plot(tseq, iris.land, type = "l"); plot(tseq, iris.sil, type = "l")
